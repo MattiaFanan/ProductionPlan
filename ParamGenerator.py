@@ -3,7 +3,8 @@ from random import uniform
 
 
 def init_production_slots():
-    return randint(1, 10 + 1) * 10
+    return 10
+    # return randint(1, 10 + 1) * 10
 
 
 def init_production_cost(model, i):

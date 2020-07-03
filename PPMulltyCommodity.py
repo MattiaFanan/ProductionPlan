@@ -6,20 +6,35 @@ from ParamGenerator import *
 
 def obj_rule(model):
     return sum(
+        model.ProductionCost[i] * model.Production[i, destination_slot]
+        + model.StockingCost[i] * model.Stock[i, destination_slot]
+        for i in model.Weeks
+        for destination_slot in model.Weeks
+        # if destination_slot >= i
+    ) + sum(
         model.SetUpCost[i] * model.SetUp[i]
-        + model.ProductionCost[i] * model.Production[i]
-        + model.Stock[i] * model.StockingCost[i]
         for i in model.Weeks
     )
 
 
-def stock_rule(model, i):
-    return model.Stock[i] == ((model.InitialStock if i == model.Weeks[0] else model.Stock[i - 1]) - model.Demand[i] +
-                              model.Production[i])
+def stock_rule(model, i, destination_slot):
+    if destination_slot < i:  # we can't stock now for past slots
+        return model.Stock[i, destination_slot] == 0
+
+    return model.Stock[i, destination_slot] == (
+            (model.InitialStock if i == model.Weeks[0] else model.Stock[i - 1, destination_slot])
+            - (model.Demand[i] if i == destination_slot else 0)  # delta(t)*(- demand(t))
+            + model.Production[i, destination_slot]
+    )
 
 
-def production_rule(model, i):
-    return sum(model.Demand[j] for j in model.Weeks if j >= i) * model.SetUp[i] >= model.Production[i]
+def production_rule(model, i, destination_slot):
+    if destination_slot <= i:  # can't produce now for past/current slots
+        return model.Production[i, destination_slot] == 0
+
+    # if we don't pay the setup we don't produce
+    # demand(x) is big_M for production(i,x)
+    return model.Demand[destination_slot] * model.SetUp[i] >= model.Production[i, destination_slot]
 
 
 def buildmodel():
@@ -30,9 +45,9 @@ def buildmodel():
     # Sets
     model.Weeks = range(1, init_production_slots() + 1)
     # variables
-    model.Production = Var(model.Weeks, domain=NonNegativeIntegers, initialize=0)
+    model.Production = Var(model.Weeks, model.Weeks, domain=NonNegativeIntegers, initialize=0)
     model.SetUp = Var(model.Weeks, domain=Binary, initialize=0)
-    model.Stock = Var(model.Weeks, domain=NonNegativeIntegers, initialize=0)
+    model.Stock = Var(model.Weeks, model.Weeks, domain=NonNegativeIntegers, initialize=0)
     # params
     model.InitialStock = Param(initialize=init_initial_stock, default=0)
     model.ProductionCost = Param(model.Weeks, initialize=init_production_cost, default=0)
@@ -42,8 +57,8 @@ def buildmodel():
     # objective
     model.obj = Objective(rule=obj_rule)
     # constraints
-    model.pc = Constraint(model.Weeks, rule=production_rule)
-    model.sc = Constraint(model.Weeks, rule=stock_rule)
+    model.pc = Constraint(model.Weeks, model.Weeks, rule=production_rule)
+    model.sc = Constraint(model.Weeks, model.Weeks, rule=stock_rule)
     return model
 
 
@@ -53,12 +68,19 @@ if __name__ == '__main__':
     instance = model.create_instance()
     opt.set_instance(instance)
     res = opt.solve(tee=False)
-    for w in instance.Weeks:
-        print("slot{} # prod = {} # stock = {} # setup = {}".format(
-            w, value(instance.Production[w]), value(instance.Stock[w]), value(instance.SetUp[w])
-        ))
 
-    print("parametri")
+    print("prod each column a production-slot row destination-slot")
+    for w in instance.Weeks:
+        print(*(value(instance.Production[i, w]) for i in instance.Weeks), sep="|")
+
+    print("setup each column a production-slot row destination-slot")
+    print(*(value(instance.SetUp[w]) for w in instance.Weeks), sep="|")
+
+    print("stock each column a production-slot row destination-slot")
+    for w in instance.Weeks:
+        print(*(value(instance.Stock[i, w]) for i in instance.Weeks), sep="|")
+
+    print("parameters")
 
     print("A0 = {}".format(value(instance.InitialStock)))
 
