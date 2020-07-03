@@ -2,6 +2,7 @@ from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.repn.plugins.baron_writer import NonNegativeIntegers, Binary
 from ParamGenerator import *
+from termcolor import colored
 
 
 def obj_rule(model):
@@ -21,15 +22,21 @@ def stock_rule(model, i, destination_slot):
     if destination_slot < i:  # we can't stock now for past slots
         return model.Stock[i, destination_slot] == 0
 
+    pre_stocked = 0
+    if i == model.Weeks[0] and destination_slot == i:  # initial stock only for demand 1
+        pre_stocked = model.InitialStock
+    elif i > model.Weeks[0]:  # picks the already stocked value if exists
+        pre_stocked = model.Stock[i - 1, destination_slot]
+
     return model.Stock[i, destination_slot] == (
-            (model.InitialStock if i == model.Weeks[0] else model.Stock[i - 1, destination_slot])
+            pre_stocked
             - (model.Demand[i] if i == destination_slot else 0)  # delta(t)*(- demand(t))
             + model.Production[i, destination_slot]
     )
 
 
 def production_rule(model, i, destination_slot):
-    if destination_slot <= i:  # can't produce now for past/current slots
+    if destination_slot < i:  # we can't produce now for past slots
         return model.Production[i, destination_slot] == 0
 
     # if we don't pay the setup we don't produce
@@ -71,18 +78,34 @@ if __name__ == '__main__':
 
     print("prod each column a production-slot row destination-slot")
     for w in instance.Weeks:
-        print(*(value(instance.Production[i, w]) for i in instance.Weeks), sep="|")
+        print(
+            *(
+                (
+                    colored(round(value(instance.Production[i, w])), "green")
+                    if i == w
+                    else round(value(instance.Production[i, w]))
+                    for i in instance.Weeks))
+            , sep="|\t"
+        )
 
-    print("setup each column a production-slot row destination-slot")
-    print(*(value(instance.SetUp[w]) for w in instance.Weeks), sep="|")
+    print("setup")
+    print(*(round(value(instance.SetUp[w])) for w in instance.Weeks), sep="|\t")
 
     print("stock each column a production-slot row destination-slot")
     for w in instance.Weeks:
-        print(*(value(instance.Stock[i, w]) for i in instance.Weeks), sep="|")
+        print(
+            *(
+                (
+                    colored(round(value(instance.Stock[i, w])), "green")
+                    if i == w
+                    else round(value(instance.Stock[i, w]))
+                    for i in instance.Weeks))
+            , sep="|\t"
+        )
 
     print("parameters")
 
-    print("A0 = {}".format(value(instance.InitialStock)))
+    print("A0 = {}".format(round(value(instance.InitialStock))))
 
     for w in instance.Weeks:
         print("slot{} # demand = {} # P-cost = {} # S-cost = {}".format(
