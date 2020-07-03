@@ -1,6 +1,8 @@
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.repn.plugins.baron_writer import NonNegativeIntegers, Binary
+from numpy.random import randint
+from random import uniform
 
 
 def obj_rule(model):
@@ -13,20 +15,20 @@ def obj_rule(model):
 
 
 def stock_rule(model, i):
-	return model.Stock[i] == ((model.InitialStock if i == 0 else model.Stock[i-1]) - model.Demand[i] + model.Production[i])
+	return model.Stock[i] == ((model.InitialStock if i == model.Weeks[0] else model.Stock[i-1]) - model.Demand[i] + model.Production[i])
 
 
 def production_rule(model, i):
-	return sum(model.Demand[j] for j in model.Weeks if j >= i) * model.SetUp[i] <= model.Production[i]
+	return sum(model.Demand[j] for j in model.Weeks if j >= i) * model.SetUp[i] >= model.Production[i]
 
 
-def buildmodel(weeks):
+def buildmodel():
 	# TODO throw an exception if dim of setup prod demand and stocking dont match
 
 	# Model
 	model = AbstractModel()
 	# Sets
-	model.Weeks = range(weeks)
+	model.Weeks = range(1,init_production_slots()+1)
 	# variables
 	model.Production = Var(model.Weeks, domain=NonNegativeIntegers, initialize=0)
 	model.SetUp = Var(model.Weeks, domain=Binary, initialize=0)
@@ -45,37 +47,46 @@ def buildmodel(weeks):
 	return model
 
 
+def init_production_slots():
+	return randint(1, 10+1) * 10
+
+
 def init_production_cost(model, i):
-	l=[0.1, 1.5, 0.75]
-	return l[i]
+	return uniform(1, 5)
 
 
 def init_setup_costs(model, i):
-	l=[0, 2.5, 2]
-	return l[i]
+	return uniform(10, 20)
 
 
 def init_stocking_cost(model, i):
-	l=[700, 700, 700]
-	return 0 # l[i]
+	return uniform(1, 5)
 
 
 def init_demand(model, i):
-	l=[100, 200, 50]
-	return l[i]
+	return randint(100, 400+1)
 
 
 def init_initial_stock(model):
-	return 50
+	return 300
 
 
 if __name__ == '__main__':
-	model = buildmodel(3)
+	model = buildmodel()
 	opt = SolverFactory('cplex_persistent')
 	instance = model.create_instance()
 	opt.set_instance(instance)
 	res = opt.solve(tee=False)
 	for w in instance.Weeks:
-		print("prod[{}] = {}".format(w, value(instance.Production[w])))
-		print("stock[{}] = {}".format(w, value(instance.Stock[w])))
-		print("setup[{}] = {}".format(w, value(instance.SetUp[w])))
+		print("slot{} # prod = {} # stock = {} # setup = {}".format(
+			w, value(instance.Production[w]), value(instance.Stock[w]), value(instance.SetUp[w])
+		))
+
+	print("parametri")
+
+	print("A0 = {}".format(value(instance.InitialStock)))
+
+	for w in instance.Weeks:
+		print("slot{} # demand = {} # P-cost = {} # S-cost = {}".format(
+			w, value(instance.Demand[w]), value(instance.ProductionCost[w]), value(instance.StockingCost[w])
+		))
