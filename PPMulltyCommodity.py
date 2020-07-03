@@ -69,12 +69,18 @@ def buildmodel():
     return model
 
 
-if __name__ == '__main__':
+def get_solution():
     model = buildmodel()
     opt = SolverFactory('cplex_persistent')
     instance = model.create_instance()
     opt.set_instance(instance)
     res = opt.solve(tee=False)
+    return instance
+
+
+if __name__ == '__main__':
+
+    instance = get_solution()
 
     print("prod each column a production-slot row destination-slot")
     for w in instance.Weeks:
