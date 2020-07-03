@@ -1,8 +1,7 @@
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.repn.plugins.baron_writer import NonNegativeIntegers, Binary
-from numpy.random import randint
-from random import uniform
+from ParamGenerator import *
 
 
 def obj_rule(model):
@@ -45,30 +44,6 @@ def buildmodel():
 	model.pc = Constraint(model.Weeks, rule=production_rule)
 	model.sc = Constraint(model.Weeks, rule=stock_rule)
 	return model
-
-
-def init_production_slots():
-	return randint(1, 10+1) * 10
-
-
-def init_production_cost(model, i):
-	return uniform(1, 5)
-
-
-def init_setup_costs(model, i):
-	return uniform(10, 20)
-
-
-def init_stocking_cost(model, i):
-	return uniform(1, 5)
-
-
-def init_demand(model, i):
-	return randint(100, 400+1)
-
-
-def init_initial_stock(model):
-	return 300
 
 
 if __name__ == '__main__':
