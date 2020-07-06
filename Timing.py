@@ -5,13 +5,12 @@ from PPMulltyCommodity import buildmodel as build_m_c_model
 
 opt = SolverFactory('cplex_persistent')
 
-# todo extract build_model from timed code --> it's required to rebuild the model because number of slots changes
-
 
 def base():
     opt.solve(tee=False)
 
 
+# extract build_model from timed code --> it's required to rebuild the model because number of slots changes
 def init_base():
     base_model = build_base_model()
     base_instance = base_model.create_instance()
