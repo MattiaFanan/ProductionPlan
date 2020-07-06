@@ -30,9 +30,9 @@ class PPMultiCommodity:
             return model.Stock[i, destination_slot] == 0
 
         pre_stocked = 0
-        if i == model.Weeks[0] and destination_slot == i:  # initial stock only for demand 1
+        if i == model.Weeks[1] and destination_slot == i:  # initial stock only for demand 1
             pre_stocked = model.InitialStock
-        elif i > model.Weeks[0]:  # picks the already stocked value if exists
+        elif i > model.Weeks[1]:  # picks the already stocked value if exists
             pre_stocked = model.Stock[i - 1, destination_slot]
 
         return model.Stock[i, destination_slot] == (
@@ -50,13 +50,12 @@ class PPMultiCommodity:
         # demand(x) is big_M for production(i,x)
         return model.Demand[destination_slot] * model.SetUp[i] >= model.Production[i, destination_slot]
 
-    def buildmodel(self):
-        # TODO throw an exception if dim of setup prod demand and stocking dont match
+    def build_model(self):
 
         # Model
         model = AbstractModel()
         # Sets
-        model.Weeks = range(1, self.param_generator.get_random_from_list(self.week_list))
+        model.Weeks = RangeSet(self.param_generator.get_random_from_list(self.week_list))
         # variables
         model.Production = Var(model.Weeks, model.Weeks, domain=NonNegativeIntegers, initialize=0)
         model.SetUp = Var(model.Weeks, domain=Binary, initialize=0)
@@ -94,7 +93,7 @@ class PPMultiCommodity:
         return model
 
     def get_solution(self):
-        model = self.buildmodel()
+        model = self.build_model()
         opt = SolverFactory('cplex_persistent')
         instance = model.create_instance()
         opt.set_instance(instance)

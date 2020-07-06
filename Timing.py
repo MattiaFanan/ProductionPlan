@@ -1,9 +1,12 @@
 from pyomo.opt import SolverFactory
 from timeit import repeat
-from PPBase import buildmodel as build_base_model
-from PPMulltyCommodity import buildmodel as build_m_c_model
+from PPBase import PPBase
+from PPMulltyCommodity import PPMultiCommodity
+from ParamGenerator import ParamGenerator
 
 opt = SolverFactory('cplex_persistent')
+base_model = PPBase(ParamGenerator())
+multi_commodity_model = PPMultiCommodity(ParamGenerator())
 
 
 def base():
@@ -12,8 +15,7 @@ def base():
 
 # extract build_model from timed code --> it's required to rebuild the model because number of slots changes
 def init_base():
-    base_model = build_base_model()
-    base_instance = base_model.create_instance()
+    base_instance = base_model.build_model().create_instance()
     opt.set_instance(base_instance)
 
 
@@ -22,9 +24,8 @@ def multi_com():
 
 
 def init_multi_com():
-    m_c_model = build_m_c_model()
-    m_c_instance = m_c_model.create_instance()
-    opt.set_instance(m_c_instance)
+    multi_commodity_instance = multi_commodity_model.build_model().create_instance()
+    opt.set_instance(multi_commodity_instance)
 
 
 if __name__ == "__main__":
