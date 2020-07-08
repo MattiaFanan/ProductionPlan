@@ -3,6 +3,7 @@ from pyomo.opt import SolverFactory
 from pyomo.repn.plugins.baron_writer import NonNegativeReals, Binary
 from ParamGenerator import ParamGenerator
 
+
 class PPBase:
 
     def __init__(self, param_generator):
@@ -74,7 +75,7 @@ class PPBase:
         instance = model.create_instance()
         opt.set_instance(instance)
         res = opt.solve(tee=False)
-        return (instance, res)
+        return instance
 
 
 if __name__ == '__main__':
