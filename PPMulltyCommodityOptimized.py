@@ -1,6 +1,6 @@
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
-from pyomo.repn.plugins.baron_writer import NonNegativeIntegers, Binary
+from pyomo.repn.plugins.baron_writer import Binary, NonNegativeReals
 from ParamGenerator import ParamGenerator
 from termcolor import colored
 
@@ -9,7 +9,7 @@ class PPMultiCommodityOptimized:
 
     def __init__(self, param_generator):
         self.param_generator = param_generator
-        self.week_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        self.week_iter = self.param_generator.init_production_slots()
 
     @staticmethod
     def _obj_rule(model):
@@ -53,39 +53,38 @@ class PPMultiCommodityOptimized:
         # Model
         model = AbstractModel()
         # Sets
-        model.Weeks = RangeSet(self.param_generator.get_random_from_list(self.week_list))
+        model.Weeks = RangeSet(next(self.week_iter))
         model.SourceDestinationIndex = Set(
             initialize=model.Weeks * model.Weeks,
             filter=self.source_destination_filter)
         # variables
-        model.Production = Var(model.SourceDestinationIndex, domain=NonNegativeIntegers, initialize=0)
-        model.SetUp = Var(model.Weeks, domain=Binary, initialize=0)
-        model.Stock = Var(model.SourceDestinationIndex, domain=NonNegativeIntegers, initialize=0)
+        model.Production = Var(model.SourceDestinationIndex, domain=NonNegativeReals)
+        model.SetUp = Var(model.Weeks, domain=Binary)
+        model.Stock = Var(model.SourceDestinationIndex, domain=NonNegativeReals)
         # params
         model.InitialStock = Param(
-            initialize=lambda mod: self.param_generator.get_uniform_int(10, 100),
+            initialize=lambda mod: self.param_generator.init_initial_stock(mod),
             default=0)
 
         model.ProductionCost = Param(
             model.Weeks,
-            initialize=lambda mod, i: self.param_generator.get_uniform_double(1, 5),
+            initialize=lambda mod, i: self.param_generator.init_production_cost(mod, i),
             default=0)
 
         model.SetUpCost = Param(
             model.Weeks,
-            initialize=lambda mod, i: self.param_generator.get_uniform_double(10, 20),
+            initialize=lambda mod, i: self.param_generator.init_setup_costs(mod, i),
             default=0)
 
         model.StockingCost = Param(
             model.Weeks,
-            initialize=lambda mod, i: self.param_generator.get_uniform_double(1, 5),
+            initialize=lambda mod, i: self.param_generator.init_stocking_cost(mod, i),
             default=0)
 
         model.Demand = Param(
             model.Weeks,
-            initialize=lambda mod, i: self.param_generator.get_uniform_int(100, 400),
+            initialize=lambda mod, i: self.param_generator.init_demand(mod, i),
             default=0)
-
         # objective
         model.obj = Objective(rule=self._obj_rule)
         # constraints
@@ -112,9 +111,9 @@ if __name__ == '__main__':
             *(
                 (
                     (
-                        colored(round(value(instance.Production[i, w])), "green")
+                        colored(value(instance.Production[i, w]), "green")
                         if i == w
-                        else round(value(instance.Production[i, w]))
+                        else value(instance.Production[i, w])
                     )
                     if (i, w) in instance.SourceDestinationIndex
                     else "x"
@@ -131,9 +130,9 @@ if __name__ == '__main__':
             *(
                 (
                     (
-                        colored(round(value(instance.Stock[i, w])), "green")
+                        colored(value(instance.Stock[i, w]), "green")
                         if i == w
-                        else round(value(instance.Stock[i, w]))
+                        else value(instance.Stock[i, w])
                     )
                     if (i, w) in instance.SourceDestinationIndex
                     else "x"
@@ -143,7 +142,7 @@ if __name__ == '__main__':
 
     print("parameters")
 
-    print("A0 = {}".format(round(value(instance.InitialStock))))
+    print("A0 = {}".format(value(instance.InitialStock)))
 
     for w in instance.Weeks:
         print("slot{} # demand = {} # P-cost = {} # S-cost = {}".format(

@@ -8,10 +8,10 @@ from ParamGenerator import ParamGenerator
 
 class Test(unittest.TestCase):
 
-    # this test may fail if there are multiple optimal solutions
+    # this test may fail if there are multiple optimal solutions --> change params in stub
     def test_same_solution(self):
         # with the stub generator they receives the same params
-        p_gen = ParamGeneratorStub(20, 7, 9)
+        p_gen = ParamGeneratorStub()
         base = PPBase(p_gen)
         multi_com = PPMultiCommodity(p_gen)
 
@@ -42,16 +42,23 @@ class Test(unittest.TestCase):
 
 class ParamGeneratorStub(ParamGenerator):
 
-    def __init__(self, weeks, uni_int, uni_double):
-        self.weeks = weeks
-        self.uni_int = uni_int
-        self.uni_double = uni_double
+    def init_production_slots(self):
+        i = 10
+        while i <= 100:
+            yield 10
+            i = i + 10
 
-    def get_uniform_int(self, min_val, max_val):
-        return self.uni_int
+    def init_production_cost(self, model, i):
+        return 1
 
-    def get_uniform_double(self, min_val, max_val):
-        return self.uni_double
+    def init_setup_costs(self, model, i):
+        return 2
 
-    def get_random_from_list(self, values):
-        return self.weeks
+    def init_stocking_cost(self, model, i):
+        return 0.5
+
+    def init_demand(self, model, i):
+        return 200
+
+    def init_initial_stock(self, model):
+        return 50
