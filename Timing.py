@@ -1,3 +1,4 @@
+from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from timeit import repeat
 from PPBase import PPBase
@@ -6,35 +7,40 @@ from PPMulltyCommodityOptimized import PPMultiCommodityOptimized
 from ParamGenerator import ParamGenerator
 
 opt = SolverFactory('cplex_persistent')
-base_model = PPBase(ParamGenerator())
-multi_commodity_model = PPMultiCommodity(ParamGenerator())
-multi_commodity_optimized_model = PPMultiCommodityOptimized(ParamGenerator())
+base_abstract_model = PPBase(ParamGenerator())
+multi_commodity_abstract_model = PPMultiCommodity(ParamGenerator())
+multi_commodity_optimized_abstract_model = PPMultiCommodityOptimized(ParamGenerator())
 
 
-def solve():
+def solve_base():
+    base_instance = base_model.create_instance()
+    opt.set_instance(base_instance)
     opt.solve(tee=False)
 
 
-# extract build_model from timed code --> it's required to rebuild the model because number of slots changes
-def init_base():
-    base_instance = base_model.build_model().create_instance()
-    opt.set_instance(base_instance)
-
-
-# extract build_model from timed code --> it's required to rebuild the model because number of slots changes
-def init_optimized():
-    multi_commodity_model_optimized_instance = multi_commodity_optimized_model.build_model().create_instance()
+def solve_optimized():
+    multi_commodity_model_optimized_instance = multi_commodity_optimized_model.create_instance()
     opt.set_instance(multi_commodity_model_optimized_instance)
+    opt.solve(tee=False)
 
 
-def init_multi_com():
-    multi_commodity_instance = multi_commodity_model.build_model().create_instance()
+def solve_multi_com():
+    multi_commodity_instance = multi_commodity_model.create_instance()
     opt.set_instance(multi_commodity_instance)
+    opt.solve(tee=False)
 
 
 if __name__ == "__main__":
-    for i in range(3):
-        print("Base: {}".format(repeat(stmt=solve, setup=init_base, repeat=7, number=1)))
-        print("MC: {}".format(repeat(stmt=solve, setup=init_multi_com, repeat=7, number=1)))
-        print("BMOpt: {}".format(repeat(stmt=solve, setup=init_optimized, repeat=7, number=1)))
+    reps = 5
+    for i in range(10):
+        # build_model changes the number of production slots
+        base_model = base_abstract_model.build_model()
+        multi_commodity_model = multi_commodity_abstract_model.build_model()
+        multi_commodity_optimized_model = multi_commodity_optimized_abstract_model.build_model()
+        # creates new instance with same number of production slots and solves it --> for #reps times
+        print("Base: {}".format(repeat(stmt=solve_base, repeat=reps, number=1)))
+        print("MC: {}".format(repeat(stmt=solve_multi_com, repeat=reps, number=1)))
+        print("BMOpt: {}".format(repeat(stmt=solve_optimized, repeat=reps, number=1)))
         print("###")
+
+

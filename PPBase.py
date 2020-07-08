@@ -1,13 +1,13 @@
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
-from pyomo.repn.plugins.baron_writer import NonNegativeIntegers, Binary
+from pyomo.repn.plugins.baron_writer import NonNegativeReals, Binary
 from ParamGenerator import ParamGenerator
 
 class PPBase:
 
     def __init__(self, param_generator):
         self.param_generator = param_generator
-        self.week_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        self.week_iter = self.param_generator.init_production_slots()
 
     @staticmethod
     def obj_rule(model):
@@ -32,34 +32,34 @@ class PPBase:
         # Model
         model = AbstractModel()
         # Sets
-        model.Weeks = RangeSet(self.param_generator.get_random_from_list(self.week_list))
+        model.Weeks = RangeSet(next(self.week_iter))
         # variables
-        model.Production = Var(model.Weeks, domain=NonNegativeIntegers, initialize=0)
-        model.SetUp = Var(model.Weeks, domain=Binary, initialize=0)
-        model.Stock = Var(model.Weeks, domain=NonNegativeIntegers, initialize=0)
+        model.Production = Var(model.Weeks, domain=NonNegativeReals)
+        model.SetUp = Var(model.Weeks, domain=Binary)
+        model.Stock = Var(model.Weeks, domain=NonNegativeReals)
         # params
         model.InitialStock = Param(
-            initialize=lambda mod: self.param_generator.get_uniform_int(10, 100),
+            initialize=lambda mod: self.param_generator.init_initial_stock(mod),
             default=0)
 
         model.ProductionCost = Param(
             model.Weeks,
-            initialize=lambda mod, i: self.param_generator.get_uniform_double(1, 5),
+            initialize=lambda mod, i: self.param_generator.init_production_cost(mod, i),
             default=0)
 
         model.SetUpCost = Param(
             model.Weeks,
-            initialize=lambda mod, i: self.param_generator.get_uniform_double(10, 20),
+            initialize=lambda mod, i: self.param_generator.init_setup_costs(mod, i),
             default=0)
 
         model.StockingCost = Param(
             model.Weeks,
-            initialize=lambda mod, i: self.param_generator.get_uniform_double(1, 5),
+            initialize=lambda mod, i: self.param_generator.init_stocking_cost(mod, i),
             default=0)
 
         model.Demand = Param(
             model.Weeks,
-            initialize=lambda mod, i: self.param_generator.get_uniform_int(100, 400),
+            initialize=lambda mod, i: self.param_generator.init_demand(mod, i),
             default=0)
         # objective
         model.obj = Objective(rule=self.obj_rule)
@@ -74,12 +74,13 @@ class PPBase:
         instance = model.create_instance()
         opt.set_instance(instance)
         res = opt.solve(tee=False)
-        return instance
+        return (instance, res)
 
 
 if __name__ == '__main__':
 
-    instance = PPBase(ParamGenerator()).get_solution()
+    (instance, res) = PPBase(ParamGenerator()).get_solution()
+    print(res)
 
     for w in instance.Weeks:
         print("slot{} # prod = {} # stock = {} # setup = {}".format(
