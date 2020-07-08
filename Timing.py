@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+import numpy as np
 from pyomo.opt import SolverFactory
 from timeit import repeat
 from PPBase import PPBase
@@ -38,7 +40,14 @@ def solve_multi_com():
 
 
 if __name__ == "__main__":
-    reps = 5
+    reps = 1
+    x = np.arange(10, 110, 10)
+
+    y_base = np.zeros(10)
+    y_commodity = np.zeros(10)
+    y_optimized = np.zeros(10)
+    y_zero = np.zeros(10)
+
     for i in range(10):
         # build_model changes the number of production slots
         base_model = base_abstract_model.build_model()
@@ -46,10 +55,23 @@ if __name__ == "__main__":
         multi_commodity_optimized_model = multi_commodity_optimized_abstract_model.build_model()
         zero_model = zero_abstract_model.build_model()
         # creates new instance with same number of production slots and solves it --> for #reps times
-        print("Base: {}".format(repeat(stmt=solve_base, repeat=reps, number=1)))
-        print("MC: {}".format(repeat(stmt=solve_multi_com, repeat=reps, number=1)))
-        print("BMOpt: {}".format(repeat(stmt=solve_optimized, repeat=reps, number=1)))
-        print("Zero: {}".format(repeat(stmt=solve_zero, repeat=reps, number=1)))
+        y_base[i] = np.average(repeat(stmt=solve_base, repeat=reps, number=1))
+        y_commodity[i] = np.average(repeat(stmt=solve_multi_com, repeat=reps, number=1))
+        y_optimized[i] = np.average(repeat(stmt=solve_optimized, repeat=reps, number=1))
+        y_zero[i] = np.average(repeat(stmt=solve_zero, repeat=reps, number=1))
+    """
+        print("Base: {}".format(x_base))
+        print("MC: {}".format(x_commodity))
+        print("BMOpt: {}".format(x_optimized))
+        print("Zero: {}".format(x_zero))
         print("###")
+    """
+    plt.plot(x, y_base, label="base")
+    plt.plot(x, y_optimized, label="opt com")
+    plt.plot(x, y_commodity, label="com")
+    plt.plot(x, y_zero, label="opt zero com")
 
-
+    plt.xlabel("# production slots")
+    plt.ylabel("solving time")
+    plt.legend(loc="upper left")
+    plt.show()
