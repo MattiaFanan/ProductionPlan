@@ -5,7 +5,7 @@ from ParamGenerator import ParamGenerator
 from termcolor import colored
 
 
-class PPMultiCommodityOptimized:
+class PPMultiCommodity:
 
     def __init__(self, param_generator):
         self.param_generator = param_generator
@@ -36,6 +36,9 @@ class PPMultiCommodityOptimized:
                 - (model.Demand[i] if i == destination_slot else 0)  # delta(t)*(- demand(t))
                 + model.Production[i, destination_slot]
         )
+    @staticmethod
+    def _zero_stock_rule(model, i,  destination_slot):
+        return model.Stock[i, destination_slot] == 0 if i == destination_slot else Constraint.Feasible
 
     @staticmethod
     def _production_rule(model, i, destination_slot):
@@ -90,6 +93,7 @@ class PPMultiCommodityOptimized:
         # constraints
         model.pc = Constraint(model.SourceDestinationIndex, rule=self._production_rule)
         model.sc = Constraint(model.SourceDestinationIndex, rule=self._stock_rule)
+        model.zs = Constraint(model.SourceDestinationIndex, rule=self._zero_stock_rule)
         return model
 
     def get_solution(self):
@@ -103,7 +107,7 @@ class PPMultiCommodityOptimized:
 
 if __name__ == '__main__':
 
-    instance = PPMultiCommodityOptimized(ParamGenerator()).get_solution()
+    instance = PPMultiCommodity(ParamGenerator()).get_solution()
 
     print("prod each column a production-slot row destination-slot")
     for w in instance.Weeks:
