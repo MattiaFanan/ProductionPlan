@@ -1,3 +1,7 @@
+"""
+This module contains the class PPBase
+can be executed as a demo script that solves a random initialized problem and prints the result
+"""
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.repn.plugins.baron_writer import NonNegativeReals, Binary
@@ -5,13 +9,16 @@ from ParamGenerator import ParamGenerator
 
 
 class PPBase:
-
+    """
+    This class manages the model for a standard O(n) variables production planning problem
+    """
     def __init__(self, param_generator):
         self.param_generator = param_generator
         self.week_iter = self.param_generator.init_production_slots()
 
+    # objective function to be passed to the model
     @staticmethod
-    def obj_rule(model):
+    def __obj_rule(model):
         return sum(
             model.SetUpCost[i] * model.SetUp[i]
             + model.ProductionCost[i] * model.Production[i]
@@ -19,26 +26,31 @@ class PPBase:
             for i in model.Weeks
         )
 
+    # rule about stocking quantities to be passed to the model
     @staticmethod
-    def stock_rule(model, i):
+    def __stock_rule(model, i):
         return model.Stock[i] == ((model.InitialStock if i == model.Weeks[1] else model.Stock[i - 1]) - model.Demand[i]
                                   + model.Production[i])
 
+    # rule about production quantities to be passed to the model
     @staticmethod
-    def production_rule(model, i):
+    def __production_rule(model, i):
         return sum(model.Demand[j] for j in model.Weeks if j >= i) * model.SetUp[i] >= model.Production[i]
 
-    def build_model(self):
-
+    def build_model(self) -> AbstractModel:
+        """
+        Builds the abstract model for the production planning problem
+        :return: the built abstract model
+        """
         # Model
         model = AbstractModel()
         # Sets
         model.Weeks = RangeSet(next(self.week_iter))
-        # variables
+        # Variables
         model.Production = Var(model.Weeks, domain=NonNegativeReals)
         model.SetUp = Var(model.Weeks, domain=Binary)
         model.Stock = Var(model.Weeks, domain=NonNegativeReals)
-        # params
+        # Params
         model.InitialStock = Param(
             initialize=lambda mod: self.param_generator.init_initial_stock(mod),
             default=0)
@@ -62,14 +74,18 @@ class PPBase:
             model.Weeks,
             initialize=lambda mod, i: self.param_generator.init_demand(mod, i),
             default=0)
-        # objective
-        model.obj = Objective(rule=self.obj_rule)
-        # constraints
-        model.pc = Constraint(model.Weeks, rule=self.production_rule)
-        model.sc = Constraint(model.Weeks, rule=self.stock_rule)
+        # Objective
+        model.obj = Objective(rule=self.__obj_rule)
+        # Constraints
+        model.pc = Constraint(model.Weeks, rule=self.__production_rule)
+        model.sc = Constraint(model.Weeks, rule=self.__stock_rule)
         return model
 
     def get_solution(self):
+        """
+        helper method that generates and solves an instance of the production planning problem
+        :return: the solved instance
+        """
         model = self.build_model()
         opt = SolverFactory('cplex_persistent')
         instance = model.create_instance()
@@ -80,15 +96,14 @@ class PPBase:
 
 if __name__ == '__main__':
 
-    (instance, res) = PPBase(ParamGenerator()).get_solution()
-    print(res)
+    instance = PPBase(ParamGenerator()).get_solution()
 
     for w in instance.Weeks:
         print("slot{} # prod = {} # stock = {} # setup = {}".format(
             w, value(instance.Production[w]), value(instance.Stock[w]), value(instance.SetUp[w])
         ))
 
-    print("parametri")
+    print("parameters")
 
     print("A0 = {}".format(value(instance.InitialStock)))
 
