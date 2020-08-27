@@ -90,24 +90,24 @@ class PPBase:
         opt = SolverFactory('cplex_persistent')
         instance = model.create_instance()
         opt.set_instance(instance)
-        res = opt.solve(tee=False)
+        result = opt.solve(tee=False)
         return instance
 
 
 if __name__ == '__main__':
 
-    instance = PPBase(ParamGenerator()).get_solution()
+    ins = PPBase(ParamGenerator()).get_solution()
 
-    for w in instance.Weeks:
+    for w in ins.Weeks:
         print("slot{} # prod = {} # stock = {} # setup = {}".format(
-            w, value(instance.Production[w]), value(instance.Stock[w]), value(instance.SetUp[w])
+            w, value(ins.Production[w]), value(ins.Stock[w]), value(ins.SetUp[w])
         ))
 
     print("parameters")
 
-    print("A0 = {}".format(value(instance.InitialStock)))
+    print("A0 = {}".format(value(ins.InitialStock)))
 
-    for w in instance.Weeks:
+    for w in ins.Weeks:
         print("slot{} # demand = {} # P-cost = {} # S-cost = {}".format(
-            w, value(instance.Demand[w]), value(instance.ProductionCost[w]), value(instance.StockingCost[w])
+            w, value(ins.Demand[w]), value(ins.ProductionCost[w]), value(ins.StockingCost[w])
         ))
