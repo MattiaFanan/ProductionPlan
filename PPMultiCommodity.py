@@ -1,3 +1,7 @@
+"""
+This module contains the class PPMultiCommodity
+can be executed as a demo script that solves a random initialized problem and prints the result
+"""
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.repn.plugins.baron_writer import Binary, NonNegativeReals
@@ -5,14 +9,17 @@ from ParamGenerator import ParamGenerator
 from termcolor import colored
 
 
-class PPMultiCommodityOptimized:
-
+class PPMultiCommodity:
+    """
+    This class manages the model for O(n^2) variables production planning problem as multi commodity
+    """
     def __init__(self, param_generator):
         self.param_generator = param_generator
         self.week_iter = self.param_generator.init_production_slots()
 
+    # objective function to be passed to the model
     @staticmethod
-    def _obj_rule(model):
+    def __obj_rule(model):
         return sum(
             model.ProductionCost[i] * model.Production[i, destination_slot]
             + model.StockingCost[i] * model.Stock[i, destination_slot]
@@ -23,8 +30,9 @@ class PPMultiCommodityOptimized:
             for i in model.Weeks
         )
 
+    # rule about stocking quantities to be passed to the model
     @staticmethod
-    def _stock_rule(model, i, destination_slot):
+    def __stock_rule(model, i, destination_slot):
         pre_stocked = 0
         if i == model.Weeks[1] and destination_slot == i:  # initial stock only for demand 1
             pre_stocked = model.InitialStock
@@ -37,26 +45,36 @@ class PPMultiCommodityOptimized:
                 + model.Production[i, destination_slot]
         )
 
+    # rule about empty stock if the destination slot is the current slot
     @staticmethod
-    def _production_rule(model, i, destination_slot):
+    def __zero_stock_rule(model, i, destination_slot):
+        return model.Stock[i, destination_slot] == 0 if i == destination_slot else Constraint.Feasible
+
+    # rule about production quantities to be passed to the model
+    @staticmethod
+    def __production_rule(model, i, destination_slot):
 
         # if we don't pay the setup we don't produce
         # demand(x) is big_M for production(i,x)
         return model.Demand[destination_slot] * model.SetUp[i] >= model.Production[i, destination_slot]
 
+    # filter that keeps only the triangular matrix of used variables of the total n^2 variables
     @staticmethod
-    def source_destination_filter(model, source, destination):
+    def __source_destination_filter(model, source, destination):
         return source <= destination
 
     def build_model(self):
-
+        """
+        Builds the abstract model for the production planning problem
+        :return: the built abstract model
+        """
         # Model
         model = AbstractModel()
         # Sets
         model.Weeks = RangeSet(next(self.week_iter))
         model.SourceDestinationIndex = Set(
             initialize=model.Weeks * model.Weeks,
-            filter=self.source_destination_filter)
+            filter=self.__source_destination_filter)
         # variables
         model.Production = Var(model.SourceDestinationIndex, domain=NonNegativeReals)
         model.SetUp = Var(model.Weeks, domain=Binary)
@@ -86,13 +104,18 @@ class PPMultiCommodityOptimized:
             initialize=lambda mod, i: self.param_generator.init_demand(mod, i),
             default=0)
         # objective
-        model.obj = Objective(rule=self._obj_rule)
+        model.obj = Objective(rule=self.__obj_rule)
         # constraints
-        model.pc = Constraint(model.SourceDestinationIndex, rule=self._production_rule)
-        model.sc = Constraint(model.SourceDestinationIndex, rule=self._stock_rule)
+        model.pc = Constraint(model.SourceDestinationIndex, rule=self.__production_rule)
+        model.sc = Constraint(model.SourceDestinationIndex, rule=self.__stock_rule)
+        model.zs = Constraint(model.SourceDestinationIndex, rule=self.__zero_stock_rule)
         return model
 
     def get_solution(self):
+        """
+        helper method that generates and solves an instance of the production planning problem
+        :return: the solved instance
+        """
         model = self.build_model()
         opt = SolverFactory('cplex_persistent')
         instance = model.create_instance()
@@ -103,7 +126,7 @@ class PPMultiCommodityOptimized:
 
 if __name__ == '__main__':
 
-    instance = PPMultiCommodityOptimized(ParamGenerator()).get_solution()
+    instance = PPMultiCommodity(ParamGenerator()).get_solution()
 
     print("prod each column a production-slot row destination-slot")
     for w in instance.Weeks:
